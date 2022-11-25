@@ -577,7 +577,7 @@ class PTSampler(object):
 
                 newlnlike = self.logl(y)
                 #newlnprob = 1 / self.temp * newlnlike + lp
-                newlnprob = newlnlike + lp
+                newlnprob = newlnlike + lp + qxy  # ADDED TO PSRMCMC
 
             if self.MPIrank == 0:
                 templnprob = [self.comm.recv(source=rank+1, tag=222+rank+1)
@@ -589,7 +589,7 @@ class PTSampler(object):
             # hastings step - broadcast acceptance
             accept = False
             if self.MPIrank == 0:
-                diff = newlnprob - lnprob0 + qxy
+                diff = newlnprob - lnprob0 # + qxy  DONE IN PARALLEL STEP
                 if diff > np.log(self.stream.random()):
                     accept = True
                 else:
