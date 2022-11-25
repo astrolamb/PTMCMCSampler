@@ -76,6 +76,7 @@ class PTSampler(object):
         logl,
         logp,
         cov,
+        CP_idx,
         groups=None,
         loglargs=[],
         loglkwargs={},
@@ -117,6 +118,9 @@ class PTSampler(object):
         self.verbose = verbose
         self.resume = resume
 
+        # ADDED: starting idx of common process params
+        self.CP_idx = CP_idx
+
         # setup output file
         if not os.path.exists(self.outDir):
             try:
@@ -156,10 +160,10 @@ class PTSampler(object):
     def initialize(
         self,
         Niter,
-        ladder=None,
-        Tmin=1,
-        Tmax=None,
-        Tskip=100,
+        #ladder=None,
+        #Tmin=1,
+        #Tmax=None,
+        #Tskip=100,
         isave=1000,
         covUpdate=1000,
         SCAMweight=30,
@@ -175,8 +179,8 @@ class PTSampler(object):
         thin=10,
         i0=0,
         neff=100000,
-        writeHotChains=False,
-        hotChain=False,
+        #writeHotChains=False,
+        #hotChain=False,
     ):
         """
         Initialize MCMC quantities
@@ -186,18 +190,16 @@ class PTSampler(object):
 
         """
         # get maximum number of iteration
-        if maxIter is None and self.MPIrank > 0:
-            maxIter = Niter
-        elif maxIter is None and self.MPIrank == 0:
+        if maxIter is None:
             maxIter = Niter
 
-        self.ladder = ladder
+        #self.ladder = ladder
         self.covUpdate = covUpdate
         self.SCAMweight = SCAMweight
         self.AMweight = AMweight
         self.DEweight = DEweight
         self.burn = burn
-        self.Tskip = Tskip
+        #self.Tskip = Tskip
         self.thin = thin
         self.isave = isave
         self.Niter = Niter
@@ -214,9 +216,9 @@ class PTSampler(object):
         self.nswap_accepted = 0
 
         # set up covariance matrix and DE buffers
-        if self.MPIrank == 0:
-            self._AMbuffer = np.zeros((self.covUpdate, self.ndim))
-            self._DEbuffer = np.zeros((self.burn, self.ndim))
+        #if self.MPIrank == 0:
+        self._AMbuffer = np.zeros((self.covUpdate, self.ndim))
+        self._DEbuffer = np.zeros((self.burn, self.ndim))
 
         # ##### setup default jump proposal distributions ##### #
 
@@ -269,21 +271,22 @@ class PTSampler(object):
         self.randomizeProposalCycle()
 
         # setup default temperature ladder
-        if self.ladder is None:
-            self.ladder = self.temperatureLadder(Tmin, Tmax=Tmax)
+        #if self.ladder is None:
+        #    self.ladder = self.temperatureLadder(Tmin, Tmax=Tmax)
 
         # temperature for current chain
-        self.temp = self.ladder[self.MPIrank]
+        #self.temp = self.ladder[self.MPIrank]
 
         # hot chain sampling from prior
-        if hotChain and self.MPIrank == self.nchain - 1:
-            self.temp = 1e80
-            self.fname = self.outDir + "/chain_hot.txt"
-        else:
-            self.fname = self.outDir + "/chain_{0}.txt".format(self.temp)
+        #if hotChain and self.MPIrank == self.nchain - 1:
+        #    self.temp = 1e80
+        #    self.fname = self.outDir + "/chain_hot.txt"
+        #else:
+        #    self.fname = self.outDir + "/chain_{0}.txt".format(self.temp)
+        self.fname = self.outDir + "/chain_1.txt"
 
         # write hot chains
-        self.writeHotChains = writeHotChains
+        #self.writeHotChains = writeHotChains
 
         self.resumeLength = 0
         if self.resume and os.path.isfile(self.fname):
@@ -308,8 +311,8 @@ class PTSampler(object):
 
         """
         # update buffer
-        if self.MPIrank == 0:
-            self._AMbuffer[iter % self.covUpdate, :] = p0
+        #if self.MPIrank == 0:
+        self._AMbuffer[iter % self.covUpdate, :] = p0
 
         # put results into arrays
         if iter % self.thin == 0:
@@ -320,12 +323,13 @@ class PTSampler(object):
 
         # write to file
         if iter % self.isave == 0 and iter > 1 and iter > self.resumeLength:
-            if self.writeHotChains or self.MPIrank == 0:
-                self._writeToFile(iter)
+            #if self.writeHotChains or self.MPIrank == 0:
+            self._writeToFile(iter)
 
             # write output covariance matrix
             np.save(self.outDir + "/cov.npy", self.cov)
-            if self.MPIrank == 0 and self.verbose and iter > 1:
+            #if self.MPIrank == 0 and self.verbose and iter > 1:
+            if self.verbose and iter > 1:
                 sys.stdout.write("\r")
                 sys.stdout.write(
                     "Finished %2.2f percent in %f s Acceptance rate = %g"
@@ -337,10 +341,10 @@ class PTSampler(object):
         self,
         p0,
         Niter,
-        ladder=None,
-        Tmin=1,
-        Tmax=None,
-        Tskip=100,
+        #ladder=None,
+        #Tmin=1,
+        #Tmax=None,
+        #Tskip=100,
         isave=1000,
         covUpdate=1000,
         SCAMweight=20,
@@ -356,8 +360,8 @@ class PTSampler(object):
         thin=10,
         i0=0,
         neff=100000,
-        writeHotChains=False,
-        hotChain=False,
+        #writeHotChains=False,
+        #hotChain=False,
     ):
         """
         Function to carry out PTMCMC sampling.
@@ -388,20 +392,20 @@ class PTSampler(object):
         """
 
         # get maximum number of iteration
-        if maxIter is None and self.MPIrank > 0:
+        if maxIter is None: # and self.MPIrank > 0:
             maxIter = Niter
-        elif maxIter is None and self.MPIrank == 0:
-            maxIter = Niter
+       # elif maxIter is None and self.MPIrank == 0:
+       #     maxIter = Niter
 
         # set up arrays to store lnprob, lnlike and chain
         # if picking up from previous run, don't re-initialize
         if i0 == 0:
             self.initialize(
                 Niter,
-                ladder=ladder,
-                Tmin=Tmin,
-                Tmax=Tmax,
-                Tskip=Tskip,
+                #ladder=ladder,
+                #Tmin=Tmin,
+                #Tmax=Tmax,
+                #Tskip=Tskip,
                 isave=isave,
                 covUpdate=covUpdate,
                 SCAMweight=SCAMweight,
@@ -417,8 +421,8 @@ class PTSampler(object):
                 thin=thin,
                 i0=i0,
                 neff=neff,
-                writeHotChains=writeHotChains,
-                hotChain=hotChain,
+                #writeHotChains=writeHotChains,
+                #hotChain=hotChain,
             )
 
         # compute lnprob for initial point in chain
@@ -438,7 +442,8 @@ class PTSampler(object):
             else:
 
                 lnlike0 = self.logl(p0)
-                lnprob0 = 1 / self.temp * lnlike0 + lp
+                #lnprob0 = 1 / self.temp * lnlike0 + lp
+                lnprob0 = lnlike0 + lp
 
         # record first values
         self.updateChains(p0, lnlike0, lnprob0, i0)
@@ -457,7 +462,7 @@ class PTSampler(object):
             p0, lnlike0, lnprob0 = self.PTMCMCOneStep(p0, lnlike0, lnprob0, iter)
 
             # compute effective number of samples
-            if iter % 1000 == 0 and iter > 2 * self.burn and self.MPIrank == 0:
+            if iter % 1000 == 0 and iter > 2 * self.burn:# and self.MPIrank == 0:
                 try:
                     Neff = iter / max(
                         1,
@@ -497,41 +502,41 @@ class PTSampler(object):
 
         """
         # update covariance matrix
-        if (iter - 1) % self.covUpdate == 0 and (iter - 1) != 0 and self.MPIrank == 0:
+        if (iter - 1) % self.covUpdate == 0 and (iter - 1) != 0:# and self.MPIrank == 0:
             self._updateRecursive(iter - 1, self.covUpdate)
 
             # broadcast to other chains
-            [self.comm.send(self.cov, dest=rank + 1, tag=111) for rank in range(self.nchain - 1)]
+            #[self.comm.send(self.cov, dest=rank + 1, tag=111) for rank in range(self.nchain - 1)]
 
         # update covariance matrix
-        if (iter - 1) % self.covUpdate == 0 and (iter - 1) != 0 and self.MPIrank > 0:
-            self.cov[:, :] = self.comm.recv(source=0, tag=111)
-            for ct, group in enumerate(self.groups):
-                covgroup = np.zeros((len(group), len(group)))
-                for ii in range(len(group)):
-                    for jj in range(len(group)):
-                        covgroup[ii, jj] = self.cov[group[ii], group[jj]]
+        #if (iter - 1) % self.covUpdate == 0 and (iter - 1) != 0 and self.MPIrank > 0:
+        #    self.cov[:, :] = self.comm.recv(source=0, tag=111)
+        #    for ct, group in enumerate(self.groups):
+        #        covgroup = np.zeros((len(group), len(group)))
+        #        for ii in range(len(group)):
+        #            for jj in range(len(group)):
+        #                covgroup[ii, jj] = self.cov[group[ii], group[jj]]
 
-                self.U[ct], self.S[ct], v = np.linalg.svd(covgroup)
+        #        self.U[ct], self.S[ct], v = np.linalg.svd(covgroup)
 
         # update DE buffer
-        if (iter - 1) % self.burn == 0 and (iter - 1) != 0 and self.MPIrank == 0:
-            self._updateDEbuffer(iter - 1, self.burn)
+        #if (iter - 1) % self.burn == 0 and (iter - 1) != 0 and self.MPIrank == 0:
+        self._updateDEbuffer(iter - 1, self.burn)
 
             # broadcast to other chains
-            [self.comm.send(self._DEbuffer, dest=rank + 1, tag=222) for rank in range(self.nchain - 1)]
+            #[self.comm.send(self._DEbuffer, dest=rank + 1, tag=222) for rank in range(self.nchain - 1)]
 
         # update DE buffer
-        if (iter - 1) % self.burn == 0 and (iter - 1) != 0 and self.MPIrank > 0:
-            self._DEbuffer = self.comm.recv(source=0, tag=222)
+        #if (iter - 1) % self.burn == 0 and (iter - 1) != 0 and self.MPIrank > 0:
+        #    self._DEbuffer = self.comm.recv(source=0, tag=222)
 
             # randomize cycle
-            if self.DEJump not in self.propCycle:
-                self.addProposalToCycle(self.DEJump, self.DEweight)
-                self.randomizeProposalCycle()
+        #    if self.DEJump not in self.propCycle:
+        #        self.addProposalToCycle(self.DEJump, self.DEweight)
+        #        self.randomizeProposalCycle()
 
         # after burn in, add DE jumps
-        if (iter - 1) == self.burn and self.MPIrank == 0:
+        if (iter - 1) == self.burn:# and self.MPIrank == 0:
             if self.verbose:
                 print("Adding DE jump with weight {0}".format(self.DEweight))
             self.addProposalToCycle(self.DEJump, self.DEweight)
@@ -551,6 +556,13 @@ class PTSampler(object):
             y, qxy, jump_name = self._jump(p0, iter)
             self.jumpDict[jump_name][0] += 1
 
+            ### HERE: Bcast CP vals
+            if self.MPIrank == 0:
+                [self.comm.send(y[self.CP_idx:], dest=rank + 1, tag=111)
+                                  for rank in range(self.nchain - 1)]
+            else:
+                y[self.CP_idx:] = self.comm.recv(source=0, tag=111)
+
             # compute prior and likelihood
             lp = self.logp(y)
 
@@ -561,12 +573,26 @@ class PTSampler(object):
             else:
 
                 newlnlike = self.logl(y)
-                newlnprob = 1 / self.temp * newlnlike + lp
+                #newlnprob = 1 / self.temp * newlnlike + lp
+                newlnprob = newlnlike + lp
 
-            # hastings step
-            diff = newlnprob - lnprob0 + qxy
-            if diff > np.log(self.stream.random()):
+            if self.MPIrank == 0:
+                templnprob = [self.comm.recv(source=rank+1, tag=222+rank+1)
+                              for rank in range(self.nchain - 1)]
+                newlnprob += sum(templnprob)
+            else:
+                self.comm.send(newlnprob, dest=0, tag=222+self.MPIrank)
 
+            # hastings step - broadcast acceptance
+            if self.MPIrank == 0:
+                diff = newlnprob - lnprob0 + qxy
+                if diff > np.log(self.stream.random()):
+                    accept = True
+                else:
+                    accept = False
+
+            accept = self.comm.bcast(accept, root=0)
+            if accept:
                 # accept jump
                 p0, lnlike0, lnprob0 = y, newlnlike, newlnprob
 
@@ -574,14 +600,14 @@ class PTSampler(object):
                 self.naccepted += 1
                 self.jumpDict[jump_name][1] += 1
         # temperature swap
-        if iter % self.Tskip == 0 and self.nchain > 1:
-            p0, lnlike0, lnprob0 = self.PTswap(p0, lnlike0, lnprob0, iter)
+        #if iter % self.Tskip == 0 and self.nchain > 1:
+        #    p0, lnlike0, lnprob0 = self.PTswap(p0, lnlike0, lnprob0, iter)
 
         self.updateChains(p0, lnlike0, lnprob0, iter)
 
         return p0, lnlike0, lnprob0
 
-    def PTswap(self, p0, lnlike0, lnprob0, iter):
+    #def PTswap(self, p0, lnlike0, lnprob0, iter):
         """
         Do parallel tempering swap.
 
@@ -600,46 +626,46 @@ class PTSampler(object):
 
         Repurposed from Neil Cornish/Bence Becsy's code:
         """
-        Ts = self.ladder
+    #    Ts = self.ladder
 
-        log_Ls = self.comm.gather(lnlike0, root=0)  # list of likelihoods from each chain
-        p0s = self.comm.gather(p0, root=0)  # list of parameter arrays from each chain
+    #    log_Ls = self.comm.gather(lnlike0, root=0)  # list of likelihoods from each chain
+    #    p0s = self.comm.gather(p0, root=0)  # list of parameter arrays from each chain
 
-        if self.MPIrank == 0:
+    #    if self.MPIrank == 0:
             # set up map to help keep track of swaps
-            swap_map = list(range(self.nchain))
+    #        swap_map = list(range(self.nchain))
 
             # loop through and propose a swap at each chain (starting from hottest chain and going down in T)
             # and keep track of results in swap_map
-            for swap_chain in reversed(range(self.nchain - 1)):
-                log_acc_ratio = -log_Ls[swap_map[swap_chain]] / Ts[swap_chain]
-                log_acc_ratio += -log_Ls[swap_map[swap_chain + 1]] / Ts[swap_chain + 1]
-                log_acc_ratio += log_Ls[swap_map[swap_chain + 1]] / Ts[swap_chain]
-                log_acc_ratio += log_Ls[swap_map[swap_chain]] / Ts[swap_chain + 1]
+    #        for swap_chain in reversed(range(self.nchain - 1)):
+    #            log_acc_ratio = -log_Ls[swap_map[swap_chain]] / Ts[swap_chain]
+    #            log_acc_ratio += -log_Ls[swap_map[swap_chain + 1]] / Ts[swap_chain + 1]
+    #            log_acc_ratio += log_Ls[swap_map[swap_chain + 1]] / Ts[swap_chain]
+    #            log_acc_ratio += log_Ls[swap_map[swap_chain]] / Ts[swap_chain + 1]
 
-                acc_ratio = np.exp(log_acc_ratio)
-                if self.stream.uniform() <= acc_ratio:
-                    swap_map[swap_chain], swap_map[swap_chain + 1] = swap_map[swap_chain + 1], swap_map[swap_chain]
-                    self.nswap_accepted += 1
-                    self.swapProposed += 1
-                else:
-                    self.swapProposed += 1
+    #            acc_ratio = np.exp(log_acc_ratio)
+    #            if self.stream.uniform() <= acc_ratio:
+    #                swap_map[swap_chain], swap_map[swap_chain + 1] = swap_map[swap_chain + 1], swap_map[swap_chain]
+    #                self.nswap_accepted += 1
+    #                self.swapProposed += 1
+    #            else:
+    #                self.swapProposed += 1
 
             # loop through the chains and record the new samples and log_Ls
-            for j in range(self.nchain):
-                p0s[j] = p0s[swap_map[j]]
-                log_Ls[j] = log_Ls[swap_map[j]]
+     #       for j in range(self.nchain):
+     #           p0s[j] = p0s[swap_map[j]]
+     #           log_Ls[j] = log_Ls[swap_map[j]]
 
         # broadcast the new samples and log_Ls to all chains
-        p0 = self.comm.scatter(p0s, root=0)
-        lnlike0 = self.comm.scatter(log_Ls, root=0)
+     #   p0 = self.comm.scatter(p0s, root=0)
+     #   lnlike0 = self.comm.scatter(log_Ls, root=0)
 
         # calculate new posterior values
-        lnprob0 = 1 / self.temp * lnlike0 + self.logp(p0)
+     #   lnprob0 = 1 / self.temp * lnlike0 + self.logp(p0)
 
-        return p0, lnlike0, lnprob0
+     #   return p0, lnlike0, lnprob0
 
-    def temperatureLadder(self, Tmin, Tmax=None, tstep=None):
+    #def temperatureLadder(self, Tmin, Tmax=None, tstep=None):
         """
         Method to compute temperature ladder. At the moment this uses
         a geometrically spaced temperature ladder with a temperature
@@ -649,18 +675,18 @@ class PTSampler(object):
 
         # TODO: make options to do other temperature ladders
 
-        if self.nchain > 1:
-            if tstep is None and Tmax is None:
-                tstep = 1 + np.sqrt(2 / self.ndim)
-            elif tstep is None and Tmax is not None:
-                tstep = np.exp(np.log(Tmax / Tmin) / (self.nchain - 1))
-            ladder = np.zeros(self.nchain)
-            for ii in range(self.nchain):
-                ladder[ii] = Tmin * tstep**ii
-        else:
-            ladder = np.array([1])
+    #    if self.nchain > 1:
+    #        if tstep is None and Tmax is None:
+    #            tstep = 1 + np.sqrt(2 / self.ndim)
+    #        elif tstep is None and Tmax is not None:
+    #            tstep = np.exp(np.log(Tmax / Tmin) / (self.nchain - 1))
+    #        ladder = np.zeros(self.nchain)
+    #        for ii in range(self.nchain):
+    #            ladder[ii] = Tmin * tstep**ii
+    #    else:
+    #        ladder = np.array([1])
 
-        return ladder
+    #    return ladder
 
     def _writeToFile(self, iter):
         """
@@ -676,8 +702,9 @@ class PTSampler(object):
         for jj in range((iter - self.isave), iter, self.thin):
             ind = int(jj / self.thin)
             pt_acc = 1
-            if self.MPIrank < self.nchain - 1 and self.swapProposed != 0:
-                pt_acc = self.nswap_accepted / self.swapProposed
+            #if self.MPIrank < self.nchain - 1 and self.swapProposed != 0:
+            #    pt_acc = self.nswap_accepted / self.swapProposed
+            pt_acc = 0  # IGNORED
 
             self._chainfile.write("\t".join(["%22.22f" % (self._chain[ind, kk]) for kk in range(self.ndim)]))
             self._chainfile.write(
@@ -688,22 +715,22 @@ class PTSampler(object):
         # write jump statistics files ####
 
         # only for T=1 chain
-        if self.MPIrank == 0:
+        #if self.MPIrank == 0:
 
-            # first write file contaning jump names and jump rates
-            fout = open(self.outDir + "/jumps.txt", "w")
-            njumps = len(self.propCycle)
-            ujumps = np.array(list(set(self.propCycle)))
-            for jump in ujumps:
-                fout.write("%s %4.2g\n" % (jump.__name__, np.sum(np.array(self.propCycle) == jump) / njumps))
+        # first write file contaning jump names and jump rates
+        fout = open(self.outDir + "/jumps.txt", "w")
+        njumps = len(self.propCycle)
+        ujumps = np.array(list(set(self.propCycle)))
+        for jump in ujumps:
+            fout.write("%s %4.2g\n" % (jump.__name__, np.sum(np.array(self.propCycle) == jump) / njumps))
 
+        fout.close()
+
+        # now write jump statistics for each jump proposal
+        for jump in self.jumpDict:
+            fout = open(self.outDir + "/" + jump + "_jump.txt", "a+")
+            fout.write("%g\n" % (self.jumpDict[jump][1] / max(1, self.jumpDict[jump][0])))
             fout.close()
-
-            # now write jump statistics for each jump proposal
-            for jump in self.jumpDict:
-                fout = open(self.outDir + "/" + jump + "_jump.txt", "a+")
-                fout.write("%g\n" % (self.jumpDict[jump][1] / max(1, self.jumpDict[jump][0])))
-                fout.close()
 
     # function to update covariance matrix for jump proposals
     def _updateRecursive(self, iter, mem):
@@ -799,8 +826,8 @@ class PTSampler(object):
             scale = 1.0
 
         # adjust scale based on temperature
-        if self.temp <= 100:
-            scale *= np.sqrt(self.temp)
+        #if self.temp <= 100:
+        #    scale *= np.sqrt(self.temp)
 
         # get parmeters in new diagonalized basis
         # y = np.dot(self.U.T, x[self.covinds])
@@ -857,8 +884,8 @@ class PTSampler(object):
             scale = 1.0
 
         # adjust scale based on temperature
-        if self.temp <= 100:
-            scale *= np.sqrt(self.temp)
+        #if self.temp <= 100:
+        #    scale *= np.sqrt(self.temp)
 
         # get parmeters in new diagonalized basis
         y = np.dot(self.U[jumpind].T, x[self.groups[jumpind]])
@@ -914,7 +941,7 @@ class PTSampler(object):
             scale = 1.0
 
         else:
-            scale = self.stream.random() * 2.4 / np.sqrt(2 * ndim) * np.sqrt(1 / beta)
+            scale = self.stream.random() * 2.4 / np.sqrt(2 * ndim)# * np.sqrt(1 / beta)
 
         for ii in range(ndim):
 
@@ -998,12 +1025,12 @@ class PTSampler(object):
 
         # call function
         ind = self.stream.integers(0, length)
-        q, qxy = self.propCycle[ind](x, iter, 1 / self.temp)
+        q, qxy = self.propCycle[ind](x, iter, 1) # / self.temp)
 
         # axuilary jump
         if len(self.aux) > 0:
             for aux in self.aux:
-                q, qxy_aux = aux(x, q, iter, 1 / self.temp)
+                q, qxy_aux = aux(x, q, iter, 1) # / self.temp)
                 qxy += qxy_aux
 
         return q, qxy, self.propCycle[ind].__name__
