@@ -472,6 +472,9 @@ class PTSampler(object):
                 except NameError:
                     Neff = 0
                     pass
+                except RuntimeError:
+                    Neff = iter
+                    pass
 
             # stop if reached maximum number of iterations
             if self.MPIrank == 0 and iter >= self.Niter - 1:
@@ -584,6 +587,7 @@ class PTSampler(object):
                 self.comm.send(newlnprob, dest=0, tag=222+self.MPIrank)
 
             # hastings step - broadcast acceptance
+            accept = False
             if self.MPIrank == 0:
                 diff = newlnprob - lnprob0 + qxy
                 if diff > np.log(self.stream.random()):
