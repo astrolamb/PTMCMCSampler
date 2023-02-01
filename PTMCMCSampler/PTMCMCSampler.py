@@ -13,7 +13,7 @@ except ImportError:
     from . import nompi4py as MPI
 
 try:
-    import acor
+    from acor import acor
 except ImportError:
     print(
         "Optional acor package is not installed. Acor is optionally used to calculate the "
@@ -461,7 +461,7 @@ class PTSampler(object):
                 try:
                     Neff = iter / max(
                         1,
-                        np.nanmax([acor.acor(self._chain[self.burn : (iter - 1), ii])[0] for ii in range(self.ndim)]),
+                        np.nanmax([acor(self._chain[self.burn : (iter - 1), ii])[0] for ii in range(self.ndim)]),
                     )
                     # print('\n {0} effective samples'.format(Neff))
                 except NameError:
